@@ -72,6 +72,21 @@ def merge(tensors_list, mode, axis=1, name="Merge"):
         elif mode == 'or':
             inference = tf.reduce_any(tf.concat(tensors, axis),
                                       reduction_indices=axis)
+        elif mode == 'weighted':
+            ypred = tensors[0][:, :1]
+            weights = tensors[1][:, :1]
+            truths = tensors[1][:, 1:]
+
+            inference = tf.multiply(ypred, weights)
+
+            const1 = tf.multiply(weights, truths)
+            const1 = tf.subtract(truths, const1)
+
+            inference = tf.add(inference, const1)
+            anti_inference = tf.subtract(
+                tf.ones(tf.shape(inference)), inference)
+
+            inference = tf.concat([inference, anti_inference], 1)
         else:
             raise Exception("Unknown merge mode", str(mode))
 
