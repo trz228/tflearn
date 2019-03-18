@@ -226,21 +226,7 @@ class TermLogger(Callback):
         return termlogs
 
     def print_termlogs(self, training_state):
-
-        termlogs = self.termlogs(
-            step=training_state.step,
-            global_loss=training_state.global_loss,
-            global_acc=training_state.global_acc,
-            step_time=training_state.step_time_total)
-
-        if self.has_ipython and not CURSES_SUPPORTED:
-            clear_output(wait=True)
-        else:
-            for i in range(len(self.data) + 1):
-                termlogs += "\033[A"
-
-        sys.stdout.write(termlogs)
-        sys.stdout.flush()
+        pass
 
     def snapshot_termlogs(self, training_state):
 
