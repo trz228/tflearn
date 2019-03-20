@@ -1,14 +1,7 @@
 # -*- coding: utf-8 -*-
-from __future__ import division, print_function, absolute_import
+from __future__ import absolute_import, division, print_function
 
 import tensorflow as tf
-
-@tf.custom_gradient
-def getpow(y, w):
-    out = tf.pow(y, w)
-    def grad(dy):
-        return w * out / y
-    return out, grad
 
 
 def merge(tensors_list, mode, axis=1, name="Merge"):
@@ -110,8 +103,10 @@ def merge(tensors_list, mode, axis=1, name="Merge"):
             weighted_y1 = tf.multiply(weighted_y1, y1truth)
 
             # 1 - weighted_prediction for each
-            anti_loss_y0 = tf.subtract(tf.ones(tf.shape(weighted_y0)), weighted_y0)
-            anti_loss_y1 = tf.subtract(tf.ones(tf.shape(weighted_y1)), weighted_y1)
+            anti_loss_y0 = tf.subtract(
+                tf.ones(tf.shape(weighted_y0)), weighted_y0)
+            anti_loss_y1 = tf.subtract(
+                tf.ones(tf.shape(weighted_y1)), weighted_y1)
 
             # Only keep (1 - weighted_value) for prediction which is true
             # Set false prediction to 0
