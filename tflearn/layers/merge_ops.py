@@ -3,6 +3,13 @@ from __future__ import division, print_function, absolute_import
 
 import tensorflow as tf
 
+@tf.custom_gradient
+def getpow(y, w):
+    out = tf.pow(y, w)
+    def grad(dy):
+        return w * out / y
+    return out, grad
+
 
 def merge(tensors_list, mode, axis=1, name="Merge"):
     """ Merge.
@@ -73,20 +80,50 @@ def merge(tensors_list, mode, axis=1, name="Merge"):
             inference = tf.reduce_any(tf.concat(tensors, axis),
                                       reduction_indices=axis)
         elif mode == 'weighted':
-            ypred = tensors[0][:, :1]
+            # Model outputs predictions in form [y0, y1] = [y0, 1 - y0]
+            # Want to weight each pair of predictions with weight w
+            # To make the loss linear wrt weight, the correct prediction
+            # Needs to be raised to the power of w
+            # If truth is [1, 0]
+            # Desired result is [y0 ** w, 1 - y0 ** w]
+            # If truth is [0, 1]
+            # Desired result is [1 - (1 - y0) ** w, (1 - y0) ** w]
+            # Note, if w = 1, truth does not matter
+
+            y0 = tensors[0][:, :1]
+            y1 = tensors[0][:, 1:]
             weights = tensors[1][:, :1]
-            truths = tensors[1][:, 1:]
+            y0truth = tensors[1][:, 1:]
+            y1truth = tf.subtract(tf.ones(tf.shape(y0truth)), y0truth)
 
-            inference = tf.multiply(ypred, weights)
+            # If any value is 0, the gradient is NaN
+            y0 = tf.clip_by_value(y0, 1e-10, 1 - 1e-10)
+            y1 = tf.clip_by_value(y1, 1e-10, 1 - 1e-10)
 
-            const1 = tf.multiply(weights, truths)
-            const1 = tf.subtract(truths, const1)
+            # Raise both predictions to the power w
+            weighted_y0 = tf.pow(y0, weights)
+            weighted_y1 = tf.pow(y1, weights)
 
-            inference = tf.add(inference, const1)
-            anti_inference = tf.subtract(
-                tf.ones(tf.shape(inference)), inference)
+            # Only keep the prediction which is true
+            # Set false prediction to 0
+            weighted_y0 = tf.multiply(weighted_y0, y0truth)
+            weighted_y1 = tf.multiply(weighted_y1, y1truth)
+
+            # 1 - weighted_prediction for each
+            anti_loss_y0 = tf.subtract(tf.ones(tf.shape(weighted_y0)), weighted_y0)
+            anti_loss_y1 = tf.subtract(tf.ones(tf.shape(weighted_y1)), weighted_y1)
+
+            # Only keep (1 - weighted_value) for prediction which is true
+            # Set false prediction to 0
+            anti_loss_y0 = tf.multiply(anti_loss_y0, y0truth)
+            anti_loss_y1 = tf.multiply(anti_loss_y1, y1truth)
+
+            # Add weighted_prediction for one prediction, and 1 - weighted_prediction for the other
+            inference = tf.add(weighted_y0, anti_loss_y1)
+            anti_inference = tf.add(weighted_y1, anti_loss_y0)
 
             inference = tf.concat([inference, anti_inference], 1)
+
         else:
             raise Exception("Unknown merge mode", str(mode))
 
